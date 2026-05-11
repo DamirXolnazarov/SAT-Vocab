@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ─── SATashkent Brand Tokens ─────────────────────────────────────── */
+/* ─── Brand tokens ────────────────────────────────────────────────── */
 :root {
   --c-primary:       #8b1a2e;
   --c-primary-dark:  #5c111e;
@@ -35,53 +35,64 @@
   --c-border:        #e0ddd8;
   --c-border-strong: #c9c5bf;
 
-  --c-bg-dark:       #1A1A1A;
-  --c-surface-dark:  #242424;
-
   --r-card:   12px;
   --r-sm:     8px;
   --r-pill:   20px;
-  --r-full:   9999px;
 
   --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md:  0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
   --shadow-lg:  0 8px 24px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
 
-  --t-fast:   150ms ease;
-  --t-base:   250ms ease;
-  --t-slow:   400ms ease;
-
-  --nav-height:     64px;
-  --sidebar-width:  240px;
+  --nav-height:    64px;
+  --sidebar-width: 240px;
 }
 
 /* ─── Dark mode ───────────────────────────────────────────────────── */
 .dark {
   --c-bg:            #1a1a1a;
-  --c-bg-off:        #242424;
-  --c-bg-subtle:     #2e2e2e;
+  --c-bg-off:        #141414;
+  --c-bg-subtle:     #242424;
   --c-text:          #f0efed;
-  --c-text-muted:    #7a7874;
-  --c-border:        #333330;
-  --c-border-strong: #4a4845;
-  --c-primary-pale:  #2a0a10;
-  --c-gold-pale:     #1e1605;
-  --c-success-pale:  #071f18;
-  --c-danger-pale:   #1f0e08;
+  --c-text-muted:    #6e6c68;
+  --c-border:        #2e2e2e;
+  --c-border-strong: #3e3e3e;
+  --c-primary-pale:  #280a10;
+  --c-gold-pale:     #1a1200;
+  --c-success-pale:  #071a13;
+  --c-danger-pale:   #1a0a06;
+  --c-warning-pale:  #1a1200;
+  --c-state-new-bg:         #0d1533;
+  --c-state-learning-bg:    #1a1200;
+  --c-state-struggling-bg:  #1a0a06;
+  --c-state-mastered-bg:    #071a13;
+}
+
+/* ─── Smooth dark mode transition ────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* Don't transition transforms and other props */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 /* ─── Reset ───────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 html {
   -webkit-text-size-adjust: 100%;
 }
 
 body {
+  margin: 0;
+  padding: 0;
   background: var(--c-bg-off);
   color: var(--c-text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -96,19 +107,16 @@ body {
   min-height: 100vh;
 }
 
-a {
-  color: var(--c-primary);
-  text-decoration: none;
-}
+a { color: var(--c-primary); text-decoration: none; }
 
 input, textarea, button, select {
   font-family: inherit;
   font-size: inherit;
+  margin: 0;
 }
 
-button {
-  cursor: pointer;
-}
+button { cursor: pointer; }
+img    { display: block; }
 
 /* ─── Scrollbar ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -136,14 +144,4 @@ button {
 /* ─── Keyframes ───────────────────────────────────────────────────── */
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
 }

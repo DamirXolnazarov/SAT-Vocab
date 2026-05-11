@@ -115,11 +115,10 @@ export function AppLayout() {
       </div>
 
       {/* Main content area */}
-      <main style={{
-        // On desktop: offset by sidebar. On mobile: full width.
-        paddingBottom: 'var(--nav-height)',
-        minHeight: '100vh',
-      }}>
+     <main style={{
+  paddingBottom: 'calc(var(--nav-height) + 24px)',
+  minHeight: '100vh',
+}}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px' }}>
           <Outlet />
         </div>
