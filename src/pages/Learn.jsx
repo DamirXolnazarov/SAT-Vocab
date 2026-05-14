@@ -233,7 +233,7 @@ function Flashcard({ word, onRate }) {
               }}
             >
               <XCircle size={16} />
-              Hard
+              I Don't Know
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.97 }}
@@ -249,7 +249,7 @@ function Flashcard({ word, onRate }) {
               }}
             >
               <CheckCircle size={16} />
-              Easy
+              I Know
             </motion.button>
           </motion.div>
         )}

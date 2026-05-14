@@ -461,7 +461,7 @@ function FlashcardDemo() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
               { icon: Check, text: 'Flip to reveal definition' },
-              { icon: Check, text: 'Rate Easy or Hard — no pressure' },
+              { icon: Check, text: 'I Know or I Don\'t Know — no pressure' },
               { icon: Check, text: 'AI-powered memory tricks included' },
               { icon: Check, text: 'Mastery tracked from 0 to 100' },
             ].map(({ icon: Icon, text }) => (
@@ -597,7 +597,7 @@ function FlashcardDemo() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
-                  Hard
+                  I Don't Know
                 </button>
                 <button
                   onClick={next}
@@ -612,7 +612,7 @@ function FlashcardDemo() {
                   }}
                 >
                   <Check size={14} strokeWidth={2.5} />
-                  Easy
+                  I Know
                 </button>
               </motion.div>
             )}
@@ -693,7 +693,7 @@ function HowItWorks({ onCTA }) {
               <div style={{
                 position: 'absolute', top: -12, right: -4,
                 fontSize: 76, fontWeight: 900,
-                color: 'rgba(139,26,46,0.05)',
+                color: 'rgba(139,26,46,0.13)',
                 fontFamily: 'Georgia, serif', lineHeight: 1,
                 pointerEvents: 'none', userSelect: 'none',
               }}>
@@ -914,11 +914,28 @@ export function Landing() {
   const navigate = useNavigate()
   const onCTA    = () => navigate('/onboarding')
 
+  // Landing is always light — force override dark mode CSS vars
+  const lightVars = {
+    '--c-bg':            '#ffffff',
+    '--c-bg-off':        '#fafaf9',
+    '--c-bg-subtle':     '#f5f4f2',
+    '--c-text':          '#3d3c3a',
+    '--c-text-muted':    '#9c9891',
+    '--c-border':        '#e0ddd8',
+    '--c-border-strong': '#c9c5bf',
+    '--c-primary-pale':  '#f9e8eb',
+    '--c-gold-pale':     '#fdf6e7',
+    '--c-gold-light':    '#f0c96a',
+    '--c-success-pale':  '#e1f5ee',
+    '--c-danger-pale':   '#fae8e4',
+  }
+
   return (
     <div style={{
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      background: 'var(--c-bg)',
-      color: 'var(--c-text)',
+      background: '#ffffff',
+      color: '#3d3c3a',
+      ...lightVars,
     }}>
       <Navbar onCTA={onCTA} />
       <Hero onCTA={onCTA} />
