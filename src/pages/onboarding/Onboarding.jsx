@@ -603,7 +603,7 @@ export function Onboarding() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) navigate('/home', { replace: true })
+    if (user) navigate("/roadmap", { replace: true })
   }, [user])
 
   const handleGuest = async () => {
@@ -612,7 +612,7 @@ export function Onboarding() {
     } catch (err) {
       console.warn('Anonymous sign-in failed:', err.message)
     }
-    navigate('/home', { replace: true })
+    navigate("/goal", { replace: true })
   }
 
   const variants = {
