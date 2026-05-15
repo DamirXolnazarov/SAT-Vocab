@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Lock, Play, CheckCircle, Flame } from 'lucide-react'
+import { Lock, Play, CheckCircle, Flame, BookOpen, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 
 /**
@@ -235,7 +235,14 @@ export function Roadmap() {
                           marginBottom: 4,
                         }}
                       >
-                        {session.isStory ? '📖 Story' : 'Session'} {session.sessionNumber}
+                        {session.isStory ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            <BookOpen size={14} />
+                            Story
+                          </span>
+                        ) : (
+                          'Session'
+                        )} {session.sessionNumber}
                       </div>
                       <div
                         style={{
@@ -298,7 +305,7 @@ export function Roadmap() {
                         marginTop: 8,
                       }}
                     >
-                      Start now →
+                      Start now <ChevronRight size={14} />
                     </motion.div>
                   )}
                 </motion.div>
