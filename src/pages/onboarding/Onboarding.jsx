@@ -599,12 +599,14 @@ function Step3({ onDone }) {
 export function Onboarding() {
   const [step,   setStep]   = useState(1)
   const navigate            = useNavigate()
-  const { user }            = useAuthStore()
+  const { user, profile }   = useAuthStore()
 
-  // Redirect if already logged in
+  // Redirect if already completed onboarding
   useEffect(() => {
-    if (user) navigate("/roadmap", { replace: true })
-  }, [user])
+    if (user && profile?.level && profile?.daily_goal) {
+      navigate("/roadmap", { replace: true })
+    }
+  }, [user, profile])
 
   const handleGuest = async () => {
     try {
