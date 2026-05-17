@@ -1,21 +1,19 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Search, Plus, Trash2, BookOpen, Sparkles, Edit2, ChevronRight
-} from 'lucide-react'
+import { Search, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 
 /**
  * VocabBank Page - Simple & Direct
  *
- * - Search curriculum words by name
- * - Add to next session + custom word bucket
+ * - Search curriculum words by name only
+ * - Add to next incomplete session + personal bucket
  * - Same-page interface (no modal)
- * - Edit/remove custom words
+ * - View/edit custom words
  */
 
-// Sample curriculum words (would be fetched from DB)
+// Sample curriculum words (10 words × 138 units = 1,380 total)
 const SAMPLE_CURRICULUM = [
   { word: 'Ambiguous', def: 'Open to multiple interpretations' },
   { word: 'Benevolent', def: 'Kindly; showing goodwill' },
@@ -39,30 +37,7 @@ const SAMPLE_CURRICULUM = [
   { word: 'Sesquipedalian', def: 'Characterized by long words' },
 ]
 
-// ─── State pill ───────────────────────────────────────────────────────────────
-
-const STATE_STYLES = {
-  new:        { bg: '#e8f0fe', color: '#3b5bdb', label: 'New'        },
-  learning:   { bg: '#fdf6e7', color: '#b07800', label: 'Learning'   },
-  struggling: { bg: '#fae8e4', color: '#c04e26', label: 'Struggling' },
-  mastered:   { bg: '#e1f5ee', color: '#0f6e56', label: 'Mastered'   },
-}
-
-
-function StatePill({ state }) {
-  const s = STATE_STYLES[state] || STATE_STYLES.new
-  return (
-    <span style={{
-      fontSize: 10, fontWeight: 600,
-      padding: '2px 8px', borderRadius: 99,
-      background: s.bg, color: s.color,
-    }}>
-      {s.label}
-    </span>
-  )
-}
-
-// ─── Word Search Result Card ──────────────────────────────────────────────────
+// ─── Search Result Card ────────────────────────────────────────────────────
 
 function SearchResultCard({ word, definition, onAdd, isAdded, onReveal, revealed }) {
   return (
@@ -215,191 +190,270 @@ function CustomWordItem({ word, definition, onDelete }) {
   )
 }
 
-// ─── VocabBank ────────────────────────────────────────────────────────────────
-
-const FILTERS = [
-  { value: 'all',        label: 'All'        },
-  { value: 'new',        label: 'New'        },
-  { value: 'learning',   label: 'Learning'   },
-  { value: 'struggling', label: 'Struggling' },
-  { value: 'mastered',   label: 'Mastered'   },
-]
+// ─── VocabBank Main ────────────────────────────────────────────────────────────
 
 export function VocabBank() {
-  const { profile }                           = useAuthStore()
-  const { words, wordsLoading, addWord, fetchWords } = useUserStore()
+  const { profile } = useAuthStore()
+  
+  const [search, setSearch] = useState('')
+  const [revealedWords, setRevealedWords] = useState(new Set())
+  const [customWords, setCustomWords] = useState([])
+  const [addedWords, setAddedWords] = useState(new Set())
+  const [loading, setLoading] = useState(false)
+  const [nextIncompleteUnit, setNextIncompleteUnit] = useState(null)
 
-  const [search,    setSearch]    = useState('')
-  const [filter,    setFilter]    = useState('all')
-  const [showModal, setShowModal] = useState(false)
-
-  // Fetch words on mount if not loaded
+  // Load custom words and find next incomplete unit on mount
   useEffect(() => {
-    if (profile?.id && words.length === 0 && !wordsLoading) {
-      fetchWords(profile.id)
+    if (!profile?.id) return
+    
+    const init = async () => {
+      setLoading(true)
+      try {
+        // Fetch custom words from user_words table
+        const { data: customData, error: customError } = await supabase
+          .from('user_words')
+          .select('*')
+          .eq('user_id', profile.id)
+
+        if (customError) throw customError
+        setCustomWords(customData || [])
+        setAddedWords(new Set(customData?.map(w => w.word.toLowerCase()) || []))
+
+        // Find next incomplete unit
+        const { data: unitData, error: unitError } = await supabase
+          .from('user_units')
+          .select('unit_id')
+          .eq('user_id', profile.id)
+          .neq('state', 'completed')
+          .order('unit_id', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+
+        // If no incomplete unit found, default to unit 1 (user's first unit)
+        if (!unitError && unitData) {
+          setNextIncompleteUnit(unitData.unit_id)
+        } else {
+          setNextIncompleteUnit(1)
+        }
+      } catch (err) {
+        console.error('Error loading VocabBank:', err)
+        setNextIncompleteUnit(1) // Default to unit 1 on error
+      } finally {
+        setLoading(false)
+      }
     }
+
+    init()
   }, [profile?.id])
 
-  const handleAdd = async (wordData) => {
-    if (!profile?.id) throw new Error('Not logged in')
-    await addWord({ ...wordData, user_id: profile.id })
+  // Toggle reveal definition
+  const toggleReveal = (word) => {
+    const newRevealed = new Set(revealedWords)
+    if (newRevealed.has(word)) {
+      newRevealed.delete(word)
+    } else {
+      newRevealed.add(word)
+    }
+    setRevealedWords(newRevealed)
   }
 
-  const filtered = words.filter(w => {
-    const matchFilter = filter === 'all' || w.state === filter
-    const matchSearch = !search.trim() ||
-      w.word.toLowerCase().includes(search.toLowerCase()) ||
-      w.definition.toLowerCase().includes(search.toLowerCase())
-    return matchFilter && matchSearch
-  })
+  // Add word to user_words and target unit
+  const handleAddWord = async (word, def) => {
+    if (!profile?.id) {
+      alert('Please log in to add words.')
+      return
+    }
 
-  const counts = {
-    new:        words.filter(w => w.state === 'new').length,
-    learning:   words.filter(w => w.state === 'learning').length,
-    struggling: words.filter(w => w.state === 'struggling').length,
-    mastered:   words.filter(w => w.state === 'mastered').length,
+    try {
+      // Insert to user_words (personal bucket)
+      const { error: insertError } = await supabase
+        .from('user_words')
+        .insert({
+          user_id: profile.id,
+          word,
+          definition: def,
+          target_unit_id: nextIncompleteUnit || 1,
+          added_at: new Date(),
+        })
+
+      if (insertError) throw insertError
+
+      // Update local state
+      setAddedWords(new Set(addedWords).add(word.toLowerCase()))
+      setCustomWords([
+        ...customWords,
+        { word, definition: def, target_unit_id: nextIncompleteUnit || 1 }
+      ])
+    } catch (err) {
+      console.error('Error adding word:', err)
+      alert('Failed to add word')
+    }
   }
+
+  // Delete custom word
+  const handleDeleteWord = async (word) => {
+    if (!profile?.id) return
+
+    try {
+      const { error } = await supabase
+        .from('user_words')
+        .delete()
+        .eq('user_id', profile.id)
+        .eq('word', word)
+
+      if (error) throw error
+
+      setCustomWords(customWords.filter(w => w.word !== word))
+      const newAdded = new Set(addedWords)
+      newAdded.delete(word.toLowerCase())
+      setAddedWords(newAdded)
+    } catch (err) {
+      console.error('Error deleting word:', err)
+      alert('Failed to delete word')
+    }
+  }
+
+  // Filter search results (by word name only)
+  const searchTerm = search.toLowerCase()
+  const filteredResults = SAMPLE_CURRICULUM.filter(w =>
+    w.word.toLowerCase().includes(searchTerm)
+  )
 
   return (
-    <div>
-      {/* Search + Add */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <Search
-            size={15}
-            color="var(--c-text-muted)"
-            style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-          />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search your words…"
-            style={{
-              width: '100%', padding: '10px 14px 10px 36px',
-              minHeight: 44, fontSize: 14,
-              background: 'var(--c-bg)',
-              border: '1px solid var(--c-border)',
-              borderRadius: 'var(--r-sm)',
-              color: 'var(--c-text)', outline: 'none',
-              boxSizing: 'border-box',
-              transition: 'border-color 0.15s ease',
-            }}
-            onFocus={e => e.target.style.borderColor = 'var(--c-primary)'}
-            onBlur={e => e.target.style.borderColor = 'var(--c-border)'}
-          />
-        </div>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowModal(true)}
+    <div style={{ maxWidth: 600 }}>
+      {/* Search Box */}
+      <div style={{ position: 'relative', marginBottom: 24 }}>
+        <Search
+          size={16}
+          color="var(--c-text-muted)"
           style={{
-            minHeight: 44, minWidth: 44, padding: '0 16px',
-            background: 'var(--c-primary)', color: '#fff',
-            border: 'none', borderRadius: 'var(--r-sm)',
-            cursor: 'pointer', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', gap: 6,
-            fontSize: 14, fontWeight: 600,
+            position: 'absolute',
+            left: 14,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
           }}
-        >
-          <Plus size={16} />
-          Add
-        </motion.button>
+        />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search words…"
+          style={{
+            width: '100%',
+            padding: '12px 14px 12px 40px',
+            fontSize: 14,
+            background: 'var(--c-bg)',
+            border: '1px solid var(--c-border)',
+            borderRadius: 'var(--r-sm)',
+            color: 'var(--c-text)',
+            outline: 'none',
+            boxSizing: 'border-box',
+            transition: 'border-color 0.15s ease',
+          }}
+          onFocus={e => e.target.style.borderColor = 'var(--c-primary)'}
+          onBlur={e => e.target.style.borderColor = 'var(--c-border)'}
+        />
       </div>
 
-      {/* Filter pills */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
-        {FILTERS.map(({ value, label }) => {
-          const count = value !== 'all' ? counts[value] : words.length
-          const active = filter === value
-          return (
-            <button
-              key={value}
-              onClick={() => setFilter(value)}
-              style={{
-                flexShrink: 0, padding: '5px 14px',
-                borderRadius: 99, fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', transition: 'all 0.15s ease',
-                border: active ? 'none' : '1px solid var(--c-border)',
-                background: active ? 'var(--c-primary)' : 'var(--c-bg)',
-                color: active ? '#fff' : 'var(--c-text-muted)',
-              }}
-            >
-              {label}
-              <span style={{ marginLeft: 5, opacity: 0.75 }}>{count}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Word list */}
-      {wordsLoading ? (
-        <div style={{ textAlign: 'center', padding: 48, color: 'var(--c-text-muted)' }}>
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 0.9, ease: 'linear' }}
-            style={{
-              width: 28, height: 28, margin: '0 auto 12px',
-              border: '2.5px solid var(--c-border)',
-              borderTopColor: 'var(--c-primary)',
-              borderRadius: '50%',
-            }}
-          />
-          Loading your words…
-        </div>
-      ) : filtered.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          style={{ textAlign: 'center', padding: '48px 20px' }}
-        >
-          <BookOpen size={40} color="var(--c-border)" style={{ margin: '0 auto 14px', display: 'block' }} />
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--c-text)', marginBottom: 6 }}>
-            {words.length === 0 ? 'No words yet' : 'No results'}
+      {/* Search Results */}
+      {search.trim() && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--c-text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginBottom: 12,
+            paddingLeft: 4,
+          }}>
+            Curriculum Words
           </div>
-          <div style={{ fontSize: 14, color: 'var(--c-text-muted)', marginBottom: 20 }}>
-            {words.length === 0
-              ? 'Add your first SAT word to get started'
-              : 'Try a different search or filter'}
-          </div>
-          {words.length === 0 && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setShowModal(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '10px 24px',
-                background: 'var(--c-primary)', color: '#fff',
-                border: 'none', borderRadius: 99,
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              <Plus size={15} />
-              Add first word
-            </motion.button>
+          {filteredResults.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '24px 16px',
+              color: 'var(--c-text-muted)',
+              fontSize: 13,
+            }}>
+              No words found
+            </div>
+          ) : (
+            <div>
+              {filteredResults.map(w => (
+                <SearchResultCard
+                  key={w.word}
+                  word={w.word}
+                  definition={w.def}
+                  isAdded={addedWords.has(w.word.toLowerCase())}
+                  revealed={revealedWords.has(w.word)}
+                  onReveal={() => toggleReveal(w.word)}
+                  onAdd={() => handleAddWord(w.word, w.def)}
+                />
+              ))}
+            </div>
           )}
-        </motion.div>
-      ) : (
-        <div>
-          <div style={{ fontSize: 12, color: 'var(--c-text-muted)', marginBottom: 10 }}>
-            {filtered.length} word{filtered.length !== 1 ? 's' : ''}
-            {filter !== 'all' ? ` · ${filter}` : ''}
-          </div>
-          <AnimatePresence>
-            {filtered.map(word => (
-              <WordCard key={word.id} word={word} />
-            ))}
-          </AnimatePresence>
         </div>
       )}
 
-      {/* Add modal */}
-      <AnimatePresence>
-        {showModal && (
-          <AddWordModal
-            onClose={() => setShowModal(false)}
-            onAdd={handleAdd}
-          />
+      {/* Custom Words Section */}
+      <div>
+        <div style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--c-text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          marginBottom: 12,
+          paddingLeft: 4,
+        }}>
+          My Words ({customWords.length})
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--c-text-muted)' }}>
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+              style={{
+                width: 24,
+                height: 24,
+                margin: '0 auto 12px',
+                border: '2px solid var(--c-border)',
+                borderTopColor: 'var(--c-primary)',
+                borderRadius: '50%',
+              }}
+            />
+            Loading…
+          </div>
+        ) : customWords.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{
+              textAlign: 'center',
+              padding: '32px 16px',
+              color: 'var(--c-text-muted)',
+              fontSize: 13,
+            }}
+          >
+            No custom words yet. Search above to add your first word!
+          </motion.div>
+        ) : (
+          <AnimatePresence>
+            {customWords.map(w => (
+              <CustomWordItem
+                key={w.word}
+                word={w.word}
+                definition={w.definition}
+                onDelete={handleDeleteWord}
+              />
+            ))}
+          </AnimatePresence>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   )
 }
+
+export default VocabBank

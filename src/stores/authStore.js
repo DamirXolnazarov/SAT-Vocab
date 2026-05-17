@@ -2,12 +2,11 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 
 export const useAuthStore = create((set, get) => ({
-  user: null,
+  user:    null,
   profile: null,
   loading: true,
 
   // ─── Initialize ─────────────────────────────────────────────────
-  // Call once on app mount. Restores session + listens for changes.
   initialize: async () => {
     const { data: { session } } = await supabase.auth.getSession()
 
@@ -44,11 +43,16 @@ export const useAuthStore = create((set, get) => ({
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) throw error
 
-    // The DB trigger auto-creates the users row — we just update it
-   const { error: profileError } = await supabase
-  .from('users')
-  .update({ username, email, level: null })
-  .eq('id', data.user.id)
+    // Update auto-created profile — level null marks "needs assessment"
+    const { error: profileError } = await supabase
+      .from('users')
+      .update({
+        username,
+        email,
+        level:                null,
+        onboarding_complete:  false,
+      })
+      .eq('id', data.user.id)
 
     if (profileError) throw profileError
 
@@ -60,8 +64,7 @@ export const useAuthStore = create((set, get) => ({
   // ─── Sign in ─────────────────────────────────────────────────────
   signIn: async ({ email, password }) => {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email, password,
     })
     if (error) throw error
     set({ user: data.user })
@@ -90,5 +93,21 @@ export const useAuthStore = create((set, get) => ({
     if (error) throw error
     set({ profile: data })
     return data
+  },
+
+  // ─── Mark onboarding complete ─────────────────────────────────────
+  // Called after journey animation finishes — user is fully set up
+  completeOnboarding: async () => {
+    const { user } = get()
+    if (!user) return
+    await supabase
+      .from('users')
+      .update({ onboarding_complete: true })
+      .eq('id', user.id)
+    set(state => ({
+      profile: state.profile
+        ? { ...state.profile, onboarding_complete: true }
+        : state.profile,
+    }))
   },
 }))

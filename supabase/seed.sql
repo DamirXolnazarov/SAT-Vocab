@@ -5,6 +5,16 @@
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Drop existing tables (in reverse dependency order)
+DROP TABLE IF EXISTS test_results CASCADE;
+DROP TABLE IF EXISTS comprehensive_tests CASCADE;
+DROP TABLE IF EXISTS story_sessions CASCADE;
+DROP TABLE IF EXISTS user_words CASCADE;
+DROP TABLE IF EXISTS user_units CASCADE;
+DROP TABLE IF EXISTS curriculum_words CASCADE;
+DROP TABLE IF EXISTS units CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- ─── Users table (extended profile) ────────────────────────────────────────────
 -- Extended by Supabase Auth, this table stores additional user data
 CREATE TABLE IF NOT EXISTS users (
@@ -126,6 +136,87 @@ CREATE TABLE IF NOT EXISTS test_results (
   answered_at timestamp with time zone DEFAULT now()
 );
 
+-- ─── RLS Policies ────────────────────────────────────────────────────────────────
+-- Enable RLS on users table
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own profile (authenticated)
+CREATE POLICY "Authenticated users can read own profile" ON users
+  FOR SELECT 
+  USING (auth.uid() = id);
+
+-- Users can update their own profile
+CREATE POLICY "Users can update own profile" ON users
+  FOR UPDATE 
+  USING (auth.uid() = id);
+
+-- Allow insert for signup (don't restrict) - for upsert on signup
+CREATE POLICY "Allow insert on users" ON users
+  FOR INSERT 
+  WITH CHECK (true);
+
+-- Enable RLS on other tables
+ALTER TABLE user_units ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_words ENABLE ROW LEVEL SECURITY;
+ALTER TABLE test_results ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own units
+CREATE POLICY "Users can read own units" ON user_units
+  FOR SELECT 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own units" ON user_units
+  FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own units" ON user_units
+  FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+-- Users can read and manage their own words
+CREATE POLICY "Users can read own words" ON user_words
+  FOR SELECT 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own words" ON user_words
+  FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own words" ON user_words
+  FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own words" ON user_words
+  FOR DELETE 
+  USING (auth.uid() = user_id);
+
+-- Users can read their own test results
+CREATE POLICY "Users can read own test results" ON test_results
+  FOR SELECT 
+  USING (auth.uid() = user_id);
+
+-- ─── Trigger to auto-create user record on signup ────────────────────────────────
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, username)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.user_metadata->>'username', SPLIT_PART(new.email, '@', 1))
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET email = EXCLUDED.email;
+  
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
 -- ─── Indexes ──────────────────────────────────────────────────────────────────
 CREATE INDEX idx_units_unit_number ON units(unit_number);
 CREATE INDEX idx_curriculum_words_unit_id ON curriculum_words(unit_id);
@@ -151,4 +242,4 @@ SELECT
   END,
   'Unit ' || num::text
 FROM GENERATE_SERIES(1, 138) num
-WHERE NOT EXISTS (SELECT 1 FROM units WHERE unit_number = num);
+ON CONFLICT (unit_number) DO NOTHING;
