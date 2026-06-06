@@ -39,19 +39,14 @@ function StepDots({ current }) {
       justifyContent: 'center', gap: 6, marginTop: 28,
     }}>
       {[1, 2, 3].map(n => (
-        <div
-          key={n}
-          style={{
-            height: 6,
-            width: n === current ? 24 : 6,
-            borderRadius: 3,
-            background: n <= current
-              ? 'var(--c-primary)'
-              : 'var(--c-border)',
-            opacity: n < current ? 0.35 : 1,
-            transition: 'all 0.25s ease',
-          }}
-        />
+        <div key={n} style={{
+          height: 6,
+          width: n === current ? 24 : 6,
+          borderRadius: 3,
+          background: n <= current ? 'var(--c-primary)' : 'var(--c-border)',
+          opacity: n < current ? 0.35 : 1,
+          transition: 'all 0.25s ease',
+        }} />
       ))}
       <span style={{ fontSize: 11, color: 'var(--c-text-muted)', marginLeft: 6 }}>
         {current}/3
@@ -95,7 +90,11 @@ function InputField({ icon, label, type = 'text', value, onChange, error, placeh
       )}
       <div style={{ position: 'relative' }}>
         {icon && (
-          <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-text-muted)', pointerEvents: 'none' }}>
+          <div style={{
+            position: 'absolute', left: 12, top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--c-text-muted)', pointerEvents: 'none',
+          }}>
             {icon}
           </div>
         )}
@@ -123,7 +122,12 @@ function InputField({ icon, label, type = 'text', value, onChange, error, placeh
           <button
             type="button"
             onClick={() => setShowPass(s => !s)}
-            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-muted)', padding: 2 }}
+            style={{
+              position: 'absolute', right: 12, top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none', border: 'none',
+              cursor: 'pointer', color: 'var(--c-text-muted)', padding: 2,
+            }}
           >
             {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -182,8 +186,7 @@ function Step1({ onNext, onGuest }) {
       minHeight: '100svh',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      padding: '32px 24px',
-      background: 'var(--c-bg-off)',
+      padding: '32px 24px', background: 'var(--c-bg-off)',
     }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <Logo />
@@ -374,7 +377,6 @@ function Step2({ onNext, onBack }) {
           How many words do you want to learn each day?
         </p>
 
-        {/* Goal options */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
           {DAILY_GOALS.map(({ value, label, sub, mins }) => {
             const active = goal === value
@@ -421,7 +423,6 @@ function Step2({ onNext, onBack }) {
           })}
         </div>
 
-        {/* Avatar */}
         <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text)', marginBottom: 12 }}>
           Pick your avatar
         </h3>
@@ -483,8 +484,7 @@ function Step3({ onDone }) {
       minHeight: '100svh',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      padding: '32px 24px',
-      background: 'var(--c-bg-off)',
+      padding: '32px 24px', background: 'var(--c-bg-off)',
     }}>
       <div style={{ width: '100%', maxWidth: 400, textAlign: 'center' }}>
         <div style={{
@@ -506,20 +506,15 @@ function Step3({ onDone }) {
           Tap the card to reveal its meaning
         </p>
 
-        {/* Flashcard */}
         <div
           onClick={() => setFlipped(f => !f)}
           style={{
-            background: 'var(--c-bg)',
-            border: '1px solid var(--c-border)',
-            borderRadius: 20, padding: '32px 28px',
-            marginBottom: 20, cursor: 'pointer',
-            boxShadow: '0 4px 24px rgba(139,26,46,0.08)',
-            minHeight: 220,
-            display: 'flex', flexDirection: 'column',
+            background: 'var(--c-bg)', border: '1px solid var(--c-border)',
+            borderRadius: 20, padding: '32px 28px', marginBottom: 20,
+            cursor: 'pointer', boxShadow: '0 4px 24px rgba(139,26,46,0.08)',
+            minHeight: 220, display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            position: 'relative', overflow: 'hidden',
-            textAlign: 'center',
+            position: 'relative', overflow: 'hidden', textAlign: 'center',
           }}
         >
           <div style={{
@@ -588,7 +583,6 @@ function Step3({ onDone }) {
           Start learning <ChevronRight size={18} />
         </motion.button>
       </div>
-
       <StepDots current={3} />
     </div>
   )
@@ -601,12 +595,20 @@ export function Onboarding() {
   const navigate            = useNavigate()
   const { user, profile }   = useAuthStore()
 
-  // Redirect if already completed onboarding
+  // ── THE KEY FIX ──
+  // Only redirect away if the user has FULLY completed onboarding.
+  // Do NOT redirect just because they have level + daily_goal set —
+  // that would skip new users who are mid-flow.
   useEffect(() => {
-    if (user && profile?.level && profile?.daily_goal) {
-      navigate("/roadmap", { replace: true })
+    if (!user) return
+
+    if (profile?.onboarding_complete === true) {
+      // Fully onboarded returning user → go straight to home
+      navigate('/home', { replace: true })
     }
-  }, [user, profile])
+    // If onboarding_complete is false/null, stay on this page
+    // The SmartRedirect in App.jsx handles routing within the onboarding flow
+  }, [user, profile?.onboarding_complete])
 
   const handleGuest = async () => {
     try {
@@ -614,7 +616,8 @@ export function Onboarding() {
     } catch (err) {
       console.warn('Anonymous sign-in failed:', err.message)
     }
-    navigate("/goal", { replace: true })
+    // Guests skip assessment — go straight to goal picker
+    navigate('/goal', { replace: true })
   }
 
   const variants = {
